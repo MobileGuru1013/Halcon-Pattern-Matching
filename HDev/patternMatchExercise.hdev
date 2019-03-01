@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.1" halcon_version="12.0.2">
+<procedure name="main">
+<interface/>
+<body>
+<l>import 'abshear_async_acquisition.hdev'</l>
+<l>import 'abshear_serialize_and_save.hdev'</l>
+<c></c>
+<l>dev_close_window ()</l>
+<l>dev_open_window (0, 0, 1024, 768, 'white', WindowHandle)</l>
+<l>dev_update_time( 'on' )</l>
+<l>dev_set_line_width (3)</l>
+<l>Colors := ['red','green','cyan']</l>
+<l>MinScore := 0.5</l>
+<l>NumMatches := 1</l>
+<c></c>
+<l>global object Image</l>
+<c></c>
+<c></c>
+<l>open_framegrabber ('GigEVision', 0, 0, 0, 0, 0, 0, 'default', -1, 'default', -1, 'false', 'default', '00111cf51192_SENSORTECHNOLOGYCOLTD_STCGE83A', 0, -1, AcqHandle)</l>
+<l>set_framegrabber_param (AcqHandle, 'ExposureTimeRaw', 9000)</l>
+<l>disp_message (WindowHandle, 'Press F5 to begin live grab. Press Left mouse click to exit live acquisition...', 'window', -1, -1, 'black', 'true')</l>
+<l>stop()</l>
+<l>abshear_async_acquisition (WindowHandle, AcqHandle)</l>
+<l>disp_message (WindowHandle, 'Hold down Left Mouse Button to select region', 'window', -1, -1, 'black', 'true')</l>
+<c></c>
+<l>draw_region( Region,WindowHandle )</l>
+<c></c>
+<l>info_smooth('deriche2',0.3,Size,Coeffs)</l>
+<l>smooth_image(Image,SmoothedImage,'deriche2',0.3)</l>
+<c>    </c>
+<l>reduce_domain( SmoothedImage, Region, ReducedImage ) </l>
+<c></c>
+<l>inspect_shape_model (ReducedImage, ModelImages, ModelRegions, 1, 160)</l>
+<c></c>
+<c>* Since the shape models contain a few extraneous edges, they will be</c>
+<c>* removed here to give a slightly nicer visualization.</c>
+<l>connection (ModelRegions, ConnectedRegions)</l>
+<l>select_shape (ConnectedRegions, SelectedRegions, 'area', 'and', 20, 100000)</l>
+<l>union1 (SelectedRegions, ModelRegions)</l>
+<l>gen_contours_skeleton_xld (ModelRegions, ModelContours, 1, 'filter')</l>
+<c></c>
+<l>create_shape_model (ReducedImage, 'auto',  -0.39, 0.79, 'auto', 'auto', 'use_polarity',  'auto',  'auto', ModelID)</l>
+<l>get_shape_model_params (ModelID, NumLevels, AngleStart, AngleExtent, AngleStep, ScaleMin, ScaleMax, ScaleStep, Metric, MinContrast)</l>
+<c></c>
+<l>abshear_serialize_and_save (SmoothedImage, ModelID)</l>
+<c></c>
+<l>keepGrabbing := true</l>
+<l>while(keepGrabbing)</l>
+<c>  </c>
+<l>     try</l>
+<l>         get_mposition(WindowHandle, Row, Column, Button ) </l>
+<l>     catch (Exception)</l>
+<l>         ErrorCode := Exception[0]</l>
+<l>     endtry</l>
+<c>   </c>
+<l>     if (Button == 1)</l>
+<l>         keepGrabbing:=false</l>
+<l>     endif</l>
+<c>   </c>
+<c>    *Grab and display an image for the matching</c>
+<l>     grab_image_async (TestImage, AcqHandle, -1)</l>
+<l>     smooth_image(TestImage,SmoothedImage,'deriche2',0.3)</l>
+<l>     dev_display( TestImage )</l>
+<l>     find_shape_model (TestImage, ModelID, -0.39,  0.79, MinScore, NumMatches, 0.5, 'least_squares', 0, 0.9, Row, Column, Angle, Score)</l>
+<c></c>
+<l>     dev_set_window (WindowHandle)</l>
+<l>     dev_set_color ('green')</l>
+<c>     </c>
+<l>     dev_display_shape_matching_results (ModelID, 'green', Row, Column, Angle, 1.0, 1.0, 0)</l>
+<l>     tuple_length(Score, ScoreLength)</l>
+<l>     if( ScoreLength &gt; 0)</l>
+<l>         tuple_first_n (Score, 0, BestMatchScore)</l>
+<l>         disp_message (WindowHandle, 'BestMatch: ' + BestMatchScore, 'window', -1, -1, 'black', 'true')</l>
+<l>         location := 'Location: ' + Row + ', ' + Column</l>
+<l>         disp_message (WindowHandle, location, 'window', 40, -1, 'black', 'true')</l>
+<l>     else</l>
+<l>         disp_message (WindowHandle, 'No match found...', 'window', -1, -1, 'black', 'true')</l>
+<l>     endif    </l>
+<c>         </c>
+<l>endwhile</l>
+<c></c>
+<l>close_framegrabber (AcqHandle)</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="abshear_async_acquisition">
+<interface>
+<ic>
+<par name="WindowHandle" base_type="ctrl" dimension="0"/>
+<par name="AcqHandle" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>global object Image</l>
+<l>keepGrabbing := true</l>
+<l>grab_image_start (AcqHandle, -1)</l>
+<c></c>
+<l>while( keepGrabbing )</l>
+<l>    grab_image_async (Image, AcqHandle, -1)</l>
+<l>    dev_display(Image)</l>
+<l>    write_string (WindowHandle, 'Press Left Mouse Button to Begin...')</l>
+<c></c>
+<l>    try</l>
+<l>        get_mposition(WindowHandle, Row, Column, Button )</l>
+<l>    catch (Exception)</l>
+<l>        ErrorCode := Exception[0]</l>
+<l>    endtry</l>
+<l>    if (Button == 1)</l>
+<l>        keepGrabbing:=false</l>
+<l>    endif</l>
+<l>endwhile</l>
+<c></c>
+<l>return()</l>
+</body>
+<docu id="abshear_async_acquisition">
+<abstract lang="en_US">Async image acquisition loop to be used at the beginning of example program. Exits on mouse left click and catches exception for mouse moving off screen.</abstract>
+<chapters lang="en_US">
+<item>Example</item>
+</chapters>
+<library lang="en_US">Pattern Matching Example</library>
+<short lang="en_US">Async image acquisition loop to be used at the beginning of example program</short>
+<parameters>
+<parameter id="AcqHandle"/>
+<parameter id="WindowHandle"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="abshear_wait_for_mouse_click">
+<interface>
+<ic>
+<par name="continueAcquisition" base_type="ctrl" dimension="0"/>
+<par name="WindowHandle" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>Button := 0</l>
+<l>get_mbutton(WindowHandle, dummy, dummy, Button)</l>
+<l>continueAcquisition := false</l>
+<l>return ( )</l>
+</body>
+<docu id="abshear_wait_for_mouse_click">
+<parameters>
+<parameter id="WindowHandle"/>
+<parameter id="continueAcquisition"/>
+</parameters>
+</docu>
+</procedure>
+<procedure name="abshear_serialize_and_save">
+<interface>
+<io>
+<par name="SmoothedImage" base_type="iconic" dimension="0"/>
+</io>
+<ic>
+<par name="ModelID" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<c></c>
+<l>serialize_shape_model (ModelID, SerializedItemHandle)</l>
+<l>serialize_image( SmoothedImage, SerializedImageHandle )</l>
+<c></c>
+<l>open_file ('shapeModel.bin', 'output_binary', FileHandle1)</l>
+<l>open_file ('image.bin', 'output_binary', FileHandle2)</l>
+<c></c>
+<l>fwrite_serialized_item(FileHandle1, SerializedItemHandle)</l>
+<l>fwrite_serialized_item(FileHandle2, SerializedImageHandle)</l>
+<c></c>
+<l>close_file(FileHandle1)</l>
+<l>close_file(FileHandle2)</l>
+<c></c>
+<l>return()</l>
+</body>
+<docu id="abshear_serialize_and_save">
+<abstract lang="en_US">Serializes and saves the shape model and corresponding image. Opens and closes the files.</abstract>
+<chapters lang="en_US">
+<item>Example</item>
+</chapters>
+<library lang="en_US">Pattern Matching Example</library>
+<short lang="en_US">Serializes and saves the shape model and corresponding image</short>
+<parameters>
+<parameter id="ModelID"/>
+<parameter id="SmoothedImage"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>
